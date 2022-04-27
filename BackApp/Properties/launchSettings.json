@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "BackApp": {
+      "commandName": "Project"
+    },
+    "No GUI": {
+      "commandName": "Project",
+      "commandLineArgs": "nogui rec s::C:\\Users\\tuzzi\\Desktop\\test o::F:\\BACKUP\\test"
+    }
+  }
+}
