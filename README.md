@@ -13,6 +13,3 @@ IMPORTANT: To do recursive backups, check "Check all subfolders".
 -To manage you schedules, click on "Show scheduled tasks". Here you can delete a single task, multiple tasks or all tasks.<br> 
 Currently you can't modify tasks, but this feature is going to be added in future updates.
 
-<b>KNOWN ISSUES:</b><br>
--The progress toast notification is not working
-
