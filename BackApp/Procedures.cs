@@ -25,7 +25,8 @@ namespace BackApp
                 if (isRecursive)
                 {
                     searchOption = SearchOption.AllDirectories;
-                    dirs = Directory.GetDirectories(source, "", searchOption).ToList();
+                    dirs.Add(source);
+                    dirs.AddRange(Directory.GetDirectories(source, "", searchOption).ToList());
                 }
                  
                 int filesNumber = Directory.GetFiles(source, "*.*", searchOption).ToList().Count;
@@ -34,9 +35,17 @@ namespace BackApp
                 {
                     foreach (String directory in dirs)
                     {
+                        String outDirRec = String.Empty;
                         files = Directory.GetFiles(directory, "*.*").ToList();
-                        String outDirRec = Path.Combine(outDir, Path.GetFileName(directory));
-                        Directory.CreateDirectory(outDirRec);
+                        if (!directory.Equals(source))
+                        {
+                            outDirRec = Path.Combine(outDir, Path.GetFileName(directory));
+                            Directory.CreateDirectory(outDirRec);
+                        }
+                        else
+                        {
+                            outDirRec = outDir;
+                        }
                         foreach (String file in files)
                         {
                             File.Copy(file, Path.Combine(outDirRec, Path.GetFileName(file)));
@@ -48,6 +57,7 @@ namespace BackApp
                 }
                 else
                 {
+                    files = Directory.GetFiles(source, "*.*").ToList();
                     foreach (String file in files)
                     {
                         File.Copy(file, Path.Combine(outDir, Path.GetFileName(file)));
