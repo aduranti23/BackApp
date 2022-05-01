@@ -11,9 +11,9 @@ namespace BackApp
 {
     internal class Procedures
     {
-        
-       const string appID = "BackApp";
-       public bool backupProcedure(Boolean isRecursive, String source, String output)
+        NLog.Logger log = NLog.LogManager.GetCurrentClassLogger();
+        const string appID = "BackApp";
+        public void backupProcedure(Boolean isRecursive, String source, String output)
         {
             List<String> files = new List<String>();
             List<String> dirs = new List<String>();
@@ -22,73 +22,80 @@ namespace BackApp
             {
                 String outDir = Path.Combine(output, String.Concat("BCK_", DateTime.Now.ToString("yyyyMMddHHmmssfff")));
                 Directory.CreateDirectory(outDir);
+                log.Info("Output directory created");
+                dirs.Add(source);
+                log.Info(String.Concat(source, " imported"));
                 if (isRecursive)
                 {
                     searchOption = SearchOption.AllDirectories;
-                    dirs.Add(source);
                     dirs.AddRange(Directory.GetDirectories(source, "", searchOption).ToList());
-                }
-                 
-                int filesNumber = Directory.GetFiles(source, "*.*", searchOption).ToList().Count;
-                int currentFile = 0;
-                if (dirs.Count > 0)
-                {
-                    foreach (String directory in dirs)
+                    foreach (String dir in dirs)
                     {
-                        String outDirRec = String.Empty;
-                        files = Directory.GetFiles(directory, "*.*").ToList();
-                        if (!directory.Equals(source))
-                        {
-                            outDirRec = Path.Combine(outDir, Path.GetFileName(directory));
-                            Directory.CreateDirectory(outDirRec);
-                        }
-                        else
-                        {
-                            outDirRec = outDir;
-                        }
-                        foreach (String file in files)
-                        {
-                            File.Copy(file, Path.Combine(outDirRec, Path.GetFileName(file)));
-                            currentFile++;
-                            double value = currentFile / filesNumber;
-                            UpdateBckProcToast(value);
-                        }
+                        log.Info(String.Concat(dir, " imported"));
                     }
                 }
-                else
+                int filesNumber = Directory.GetFiles(source, "*.*", searchOption).ToList().Count;
+                log.Info(String.Concat("Copying ", filesNumber, " file(s)"));
+                int currentFile = 0;
+                foreach (String directory in dirs)
                 {
-                    files = Directory.GetFiles(source, "*.*").ToList();
+                    log.Info(String.Concat("Processing directory ", directory));
+                    String outDirRec = String.Empty;
+                    files = Directory.GetFiles(directory, "*.*").ToList();
+                    log.Info(String.Concat(files.Count, " files in directory"));
+                    if (!directory.Equals(source))
+                    {
+                        outDirRec = directory.Replace(source, outDir); //Path.Combine(outDir, directory.Substring(source.Length + 1));
+                        Directory.CreateDirectory(outDirRec);
+                    }
+                    else
+                    {
+                        outDirRec = outDir;
+                    }
                     foreach (String file in files)
                     {
-                        File.Copy(file, Path.Combine(outDir, Path.GetFileName(file)));
+                        try
+                        {
+                            File.Copy(file, Path.Combine(outDirRec, Path.GetFileName(file)));
+                        }
+                        catch (Exception ex)
+                        {
+                            log.Error(String.Concat("ERROR: File ", file, " not copied: ", ex.Message, " ", ex.StackTrace));
+                        }
                         currentFile++;
                         double value = currentFile / filesNumber;
                         UpdateBckProcToast(value);
                     }
+                    log.Info(String.Concat("Directory ", directory, " processed"));
                 }
-                return true;
+                log.Info("Backup terminated correctly");
             }
             catch
             {
-                return false;
+                log.Error("ERROR during backup");
+                throw;
             }
         }
         public void TextToastNotificationBuilder(String text)
         {
+            log.Info("Building text toast notification...");
             ToastContentBuilder notification = new ToastContentBuilder();
             try
             {
                 notification.AddText("BackApp", hintMaxLines: 1);
                 notification.AddText(text);
                 notification.Show();
+                log.Info("Toast notification built");
             }
             catch (Exception ex)
             {
+                log.Error(String.Concat("Error during toast notification build-up: ", ex.Message, " ", ex.StackTrace));
                 throw;
             }
         }
         public ToastContentBuilder ProgressBarToastNotificationBuilder(String title, String value, String status)
         {
+            log.Info("Building progress toast notification...");
             ToastContentBuilder notification = new ToastContentBuilder();
             try
             {
@@ -101,64 +108,62 @@ namespace BackApp
                         Status = status
                     }
                     );
+                log.Info("Toast notification built");
                 return notification;
             }
             catch (Exception ex)
             {
+                log.Error(String.Concat("Error during toast notification build-up: ", ex.Message, " ", ex.StackTrace));
                 throw;
             }
         }
-        public void mainProcedure(string[] args, string source, string output)
-        {
-            try
-            {
-                Boolean isRecursive = false;
-                if (args.Contains("rec"))
-                {
-                    isRecursive = true;
-                }
-                SendUpdatableToastWithProgressBckProc("Progress", "progressValue", "Copying files to backup folder...");
-                if (backupProcedure(isRecursive, source, output))
-                {
-                    TextToastNotificationBuilder("Backup has terminated correctly");
-                }
-                else
-                {
-                    TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
-                }
-            }
-            catch
-            {
-                TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
-            }
-        }
+
         public void mainProcedure(Boolean isRecursive, string source, string output)
         {
+            log.Info("Initializing backup...");
             try
             {
-                SendUpdatableToastWithProgressBckProc("Progress", "progressValue", "Copying files to backup folder...");
-                if (backupProcedure(isRecursive, source, output))
+                if (isRecursive)
                 {
-                    TextToastNotificationBuilder("Backup has terminated correctly");
+                    log.Info("Recursive backup");
                 }
                 else
                 {
-                    TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
+                    log.Info("Not recursive backup");
+                }
+                SendUpdatableToastWithProgressBckProc("Progress", "progressValue", "Copying files to backup folder...");
+                try
+                {
+                    backupProcedure(isRecursive, source, output);
+                    TextToastNotificationBuilder("Backup has terminated correctly");
+                }
+                catch
+                {
+                    throw;
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                log.Error(String.Concat(ex.Message, " ", ex.StackTrace));
                 TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
             }
         }
         public void SendUpdatableToastWithProgressBckProc(String title, String value, String status)
         {
-            
-            ToastNotification bckProgressBar = new ToastNotification(ProgressBarToastNotificationBuilder(title, value, status).GetXml());
-            bckProgressBar.Tag = "backup-procedure";
-            bckProgressBar.Data = new NotificationData();
-            bckProgressBar.Data.Values[value] = "0";
-            ToastNotificationManager.CreateToastNotifier(appID).Show(bckProgressBar);
+            log.Info("Creating progress toast notification...");
+            try
+            {
+                ToastNotification bckProgressBar = new ToastNotification(ProgressBarToastNotificationBuilder(title, value, status).GetXml());
+                bckProgressBar.Tag = "backup-procedure";
+                bckProgressBar.Data = new NotificationData();
+                bckProgressBar.Data.Values[value] = "0";
+                ToastNotificationManager.CreateToastNotifier(appID).Show(bckProgressBar);
+                log.Info("Toast notification created");
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex.Message, " ", ex.StackTrace);
+            }
         }
         public void UpdateBckProcToast(double value)
         {
