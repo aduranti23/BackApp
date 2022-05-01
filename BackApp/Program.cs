@@ -26,7 +26,7 @@ namespace BackApp
                     }
                     else
                     {
-                        procedures.mainProcedure(args, source, output);
+                        procedures.mainProcedure(args.Contains("rec"), source, output);
                     }
                 }
                 catch
