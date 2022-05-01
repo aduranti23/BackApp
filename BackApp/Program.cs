@@ -8,14 +8,17 @@ namespace BackApp
         [STAThread]
         static void Main(string[] args)
         {
+            NLog.Logger log = NLog.LogManager.GetCurrentClassLogger();
             Procedures procedures = new Procedures();
             if (!args.Contains("nogui"))
             {
+                log.Info("Inizializing UI...");
                 ApplicationConfiguration.Initialize();
                 Application.Run(new GUI());
             }
             else
             {
+                log.Info("Initializing console...");
                 try
                 {
                     string source = args.Where(a => a.Contains("s::")).FirstOrDefault().Split("::")[1];
