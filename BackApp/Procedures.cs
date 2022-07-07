@@ -12,7 +12,6 @@ namespace BackApp
     internal class Procedures
     {
         NLog.Logger log = NLog.LogManager.GetCurrentClassLogger();
-        const string appID = "BackApp";
         public void backupProcedure(Boolean isRecursive, String source, String output)
         {
             List<String> files = new List<String>();
@@ -36,7 +35,7 @@ namespace BackApp
                 }
                 int filesNumber = Directory.GetFiles(source, "*.*", searchOption).ToList().Count;
                 log.Info(String.Concat("Copying ", filesNumber, " file(s)"));
-                int currentFile = 0;
+                double currentFile = 0;
                 foreach (String directory in dirs)
                 {
                     log.Info(String.Concat("Processing directory ", directory));
@@ -65,6 +64,7 @@ namespace BackApp
                         currentFile++;
                         double value = currentFile / filesNumber;
                         UpdateBckProcToast(value);
+                        Thread.Sleep(5);
                     }
                     log.Info(String.Concat("Directory ", directory, " processed"));
                 }
@@ -74,6 +74,37 @@ namespace BackApp
             {
                 log.Error("ERROR during backup");
                 throw;
+            }
+        }
+        public void mainProcedure(Boolean isRecursive, string source, string output)
+        {
+            log.Info("Initializing backup...");
+            try
+            {
+                if (isRecursive)
+                {
+                    log.Info("Recursive backup");
+                }
+                else
+                {
+                    log.Info("Not recursive backup");
+                }
+                ToastNotification progressNotification = SendUpdatableToastWithProgressBckProc();
+                try
+                {
+                    backupProcedure(isRecursive, source, output);
+                    ToastNotificationManagerCompat.CreateToastNotifier().Hide(progressNotification);
+                    TextToastNotificationBuilder("Backup has terminated correctly");
+                }
+                catch
+                {
+                    throw;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error(String.Concat(ex.Message, " ", ex.StackTrace));
+                TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
             }
         }
         public void TextToastNotificationBuilder(String text)
@@ -93,76 +124,38 @@ namespace BackApp
                 throw;
             }
         }
-        public ToastContentBuilder ProgressBarToastNotificationBuilder(String title, String value, String status)
+        public ToastNotification SendUpdatableToastWithProgressBckProc()
         {
-            log.Info("Building progress toast notification...");
-            ToastContentBuilder notification = new ToastContentBuilder();
+            string value = "progressValue";
+            log.Info("Creating progress toast notification...");
             try
             {
+                log.Info("Building progress toast notification...");
+                ToastContentBuilder notification = new ToastContentBuilder();
                 notification.AddText("BackApp", hintMaxLines: 1);
                 notification.AddVisualChild(
                     new AdaptiveProgressBar()
                     {
-                        Title = title,
+                        Title = "Running backup...",
                         Value = new BindableProgressBarValue(value),
-                        Status = status
+                        Status = "Copying files to backup folder..."
                     }
                     );
                 log.Info("Toast notification built");
-                return notification;
-            }
-            catch (Exception ex)
-            {
-                log.Error(String.Concat("Error during toast notification build-up: ", ex.Message, " ", ex.StackTrace));
-                throw;
-            }
-        }
-
-        public void mainProcedure(Boolean isRecursive, string source, string output)
-        {
-            log.Info("Initializing backup...");
-            try
-            {
-                if (isRecursive)
-                {
-                    log.Info("Recursive backup");
-                }
-                else
-                {
-                    log.Info("Not recursive backup");
-                }
-                SendUpdatableToastWithProgressBckProc("Progress", "progressValue", "Copying files to backup folder...");
-                try
-                {
-                    backupProcedure(isRecursive, source, output);
-                    TextToastNotificationBuilder("Backup has terminated correctly");
-                }
-                catch
-                {
-                    throw;
-                }
-            }
-            catch (Exception ex)
-            {
-                log.Error(String.Concat(ex.Message, " ", ex.StackTrace));
-                TextToastNotificationBuilder("There was a problem with your backup. Retry or check log files and contact the developer.");
-            }
-        }
-        public void SendUpdatableToastWithProgressBckProc(String title, String value, String status)
-        {
-            log.Info("Creating progress toast notification...");
-            try
-            {
-                ToastNotification bckProgressBar = new ToastNotification(ProgressBarToastNotificationBuilder(title, value, status).GetXml());
+                ToastNotification bckProgressBar = new ToastNotification(notification.GetToastContent().GetXml());
                 bckProgressBar.Tag = "backup-procedure";
                 bckProgressBar.Data = new NotificationData();
                 bckProgressBar.Data.Values[value] = "0";
-                ToastNotificationManager.CreateToastNotifier(appID).Show(bckProgressBar);
+                bckProgressBar.Data.SequenceNumber = 0;
+                bckProgressBar.Priority = ToastNotificationPriority.Default;
+                ToastNotificationManagerCompat.CreateToastNotifier().Show(bckProgressBar);
                 log.Info("Toast notification created");
+                return bckProgressBar;
             }
             catch (Exception ex)
             {
                 log.Error(ex.Message, " ", ex.StackTrace);
+                throw;
             }
         }
         public void UpdateBckProcToast(double value)
@@ -171,12 +164,15 @@ namespace BackApp
             NotificationData data = new NotificationData();
             try
             {
-                data.Values["progressValue"] = value.ToString();
-                ToastNotificationManager.CreateToastNotifier(appID).Update(data, tag);
+                data.Values["progressValue"] = value.ToString().Replace(',', '.');
             }
             catch
             {
                 throw;
+            }
+            finally
+            {
+                ToastNotificationManagerCompat.CreateToastNotifier().Update(data, tag);
             }
         }
         public bool dailySchedule(DateTimePicker time, short daysInterval, TaskDefinition td)

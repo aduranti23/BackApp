@@ -17,9 +17,10 @@ namespace BackApp
         }
         private void button1_Click(object sender, EventArgs e)
         {
+            Thread t = new Thread(() => procedures.mainProcedure(chkIsRecursive.Checked, sourceBox.Text, outBox.Text));
             if (!String.IsNullOrEmpty(sourceBox.Text) && !String.IsNullOrEmpty(outBox.Text))
             {
-                procedures.mainProcedure(chkIsRecursive.Checked, sourceBox.Text, outBox.Text);
+                t.Start();
             }
             else if (String.IsNullOrEmpty(sourceBox.Text))
             {
