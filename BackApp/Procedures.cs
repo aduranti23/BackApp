@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Toolkit.Uwp.Notifications;
+using Microsoft.VisualBasic.Logging;
 using Microsoft.Win32.TaskScheduler;
 using Windows.UI.Notifications;
 
@@ -14,9 +16,9 @@ namespace BackApp
         NLog.Logger log = NLog.LogManager.GetCurrentClassLogger();
         public void backupProcedure(Boolean isRecursive, String source, String output)
         {
-            List<String> files = new List<String>();
+            Dictionary<String, byte[]> files = new Dictionary<String, byte[]>();
             List<String> dirs = new List<String>();
-            SearchOption searchOption = SearchOption.TopDirectoryOnly;
+            int filesNumber = 0;
             try
             {
                 String outDir = Path.Combine(output, String.Concat("BCK_", DateTime.Now.ToString("yyyyMMddHHmmssfff")));
@@ -24,23 +26,26 @@ namespace BackApp
                 log.Info("Output directory created");
                 dirs.Add(source);
                 log.Info(String.Concat(source, " imported"));
+                filesNumber = Directory.GetFiles(source, "*.*").ToList().Count;
                 if (isRecursive)
                 {
-                    searchOption = SearchOption.AllDirectories;
-                    dirs.AddRange(Directory.GetDirectories(source, "", searchOption).ToList());
-                    foreach (String dir in dirs)
+                    foreach (string dir in Directory.GetDirectories(source, "", SearchOption.AllDirectories))
                     {
+                        dirs.Add(dir);
                         log.Info(String.Concat(dir, " imported"));
-                    }
+                        filesNumber += Directory.GetFiles(dir, "*.*").ToList().Count;
+                    } 
                 }
-                int filesNumber = Directory.GetFiles(source, "*.*", searchOption).ToList().Count;
                 log.Info(String.Concat("Copying ", filesNumber, " file(s)"));
                 double currentFile = 0;
                 foreach (String directory in dirs)
                 {
                     log.Info(String.Concat("Processing directory ", directory));
                     String outDirRec = String.Empty;
-                    files = Directory.GetFiles(directory, "*.*").ToList();
+                    foreach (String file in Directory.GetFiles(directory, "*.*").ToList())
+                    {
+                        files.Add(file, CalcHash(file));
+                    }
                     log.Info(String.Concat(files.Count, " files in directory"));
                     if (!directory.Equals(source))
                     {
@@ -51,11 +56,24 @@ namespace BackApp
                     {
                         outDirRec = outDir;
                     }
-                    foreach (String file in files)
+                    foreach (KeyValuePair<String, byte[]> file in files)
                     {
                         try
                         {
-                            File.Copy(file, Path.Combine(outDirRec, Path.GetFileName(file)));
+                            String copiedFile = Path.Combine(outDirRec, Path.GetFileName(file.Key));
+                            log.Info(String.Concat("Valid checksum: copying file ", file.Key, " to ", outDirRec));
+                            File.Copy(file.Key, copiedFile);
+                            byte[] hash = CalcHash(file.Key);
+                            log.Info(String.Concat("MD5 checksum: old value = ", Encoding.Default.GetString(file.Value), ", new value = ", Encoding.Default.GetString(hash)));
+                            if (file.Value.SequenceEqual(hash))
+                            {
+                                log.Info("Valid checksum");
+                            }
+                            else
+                            {
+                                log.Error(String.Concat("ERROR: Invalid checksum for file ", copiedFile));
+                                File.Delete(copiedFile);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -271,6 +289,13 @@ namespace BackApp
             {
                 MessageBox.Show("Write almost a day of the month!");
                 return false;
+            }
+        }
+        public byte[] CalcHash(String file)
+        {
+            using (var md5 = MD5.Create())
+            {
+                return md5.ComputeHash(File.ReadAllBytes(file));
             }
         }
     }
