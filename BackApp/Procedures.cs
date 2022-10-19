@@ -16,7 +16,6 @@ namespace BackApp
         NLog.Logger log = NLog.LogManager.GetCurrentClassLogger();
         public void backupProcedure(Boolean isRecursive, String source, String output)
         {
-            Dictionary<String, byte[]> files = new Dictionary<String, byte[]>();
             List<String> dirs = new List<String>();
             int filesNumber = 0;
             try
@@ -40,6 +39,7 @@ namespace BackApp
                 double currentFile = 0;
                 foreach (String directory in dirs)
                 {
+                    Dictionary<String, byte[]> files = new Dictionary<String, byte[]>();
                     log.Info(String.Concat("Processing directory ", directory));
                     String outDirRec = String.Empty;
                     foreach (String file in Directory.GetFiles(directory, "*.*").ToList())
@@ -61,13 +61,13 @@ namespace BackApp
                         try
                         {
                             String copiedFile = Path.Combine(outDirRec, Path.GetFileName(file.Key));
-                            log.Info(String.Concat("Valid checksum: copying file ", file.Key, " to ", outDirRec));
+                            log.Info(String.Concat("Copying file ", file.Key, " to ", outDirRec));
                             File.Copy(file.Key, copiedFile);
-                            byte[] hash = CalcHash(file.Key);
+                            byte[] hash = CalcHash(copiedFile);
                             log.Info(String.Concat("MD5 checksum: old value = ", Encoding.Default.GetString(file.Value), ", new value = ", Encoding.Default.GetString(hash)));
                             if (file.Value.SequenceEqual(hash))
                             {
-                                log.Info("Valid checksum");
+                                log.Info("Valid checksum, file successfully copied");
                             }
                             else
                             {
